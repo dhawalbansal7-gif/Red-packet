@@ -39,6 +39,8 @@ export default function Register({ onNavigate, onAddToast }: RegisterProps) {
         errorMsg = 'This WePlay ID is already registered.';
       } else if (err.code === 'auth/weak-password') {
         errorMsg = 'Password strength issues. Try containing numbers and symbols.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMsg = 'Email & Password authentication is disabled in your Firebase console. Please visit Firebase Console > Authentication > Sign-in method and enable it.';
       } else if (err.message) {
         errorMsg = err.message;
       }

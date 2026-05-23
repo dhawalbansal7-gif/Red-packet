@@ -296,6 +296,33 @@ export default function SponsorDashboard({ onAddToast }: SponsorDashboardProps) 
           </div>
         </div>
 
+        {/* Sponsor Custom Tracked Data (Managed by Manager) */}
+        <div className="bg-slate-900 text-white rounded-2xl border border-red-900/50 p-6 mb-8 shadow-md">
+          <h3 className="text-sm font-bold tracking-wider uppercase text-red-400 mb-4 flex items-center gap-2">
+            <Sparkles className="w-4 h-4" /> Sponsor Tracked Data (Manager Managed)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-slate-950/60 rounded-xl border border-slate-800 p-4">
+              <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Total Invites</span>
+              <span className="text-2xl font-black font-mono text-white">
+                {userProfile?.totalInvites !== undefined ? userProfile.totalInvites : 0}
+              </span>
+            </div>
+            <div className="bg-slate-950/60 rounded-xl border border-slate-800 p-4">
+              <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Red Packets Given</span>
+              <span className="text-2xl font-black font-mono text-emerald-400">
+                {userProfile?.redPacketsGiven !== undefined ? userProfile.redPacketsGiven : 0}
+              </span>
+            </div>
+            <div className="bg-slate-950/60 rounded-xl border border-slate-800 p-4">
+              <span className="text-xs font-bold uppercase text-slate-400 block mb-1">Red Packets to be Given</span>
+              <span className="text-2xl font-black font-mono text-amber-400">
+                {userProfile?.redPacketsToBeGiven !== undefined ? userProfile.redPacketsToBeGiven : 0}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Dashboard grid metrics cards */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 animate-fade-in animate-duration-300">
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm text-center">

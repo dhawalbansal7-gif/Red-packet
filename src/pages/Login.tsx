@@ -31,6 +31,8 @@ export default function Login({ onNavigate, onAddToast }: LoginProps) {
         errorMsg = 'Incorrect password or authentication error.';
       } else if (err.code === 'auth/user-not-found') {
         errorMsg = 'No user account found with this WePlay ID.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errorMsg = 'Email & Password authentication is disabled in your Firebase console. Please visit Firebase Console > Authentication > Sign-in method and enable it.';
       } else if (err.message) {
         errorMsg = err.message;
       }

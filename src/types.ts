@@ -9,6 +9,9 @@ export interface UserProfile {
   approvalStatus: ApprovalStatus;
   createdAt: any; // Timestamp
   lastLogin?: any; // Timestamp
+  totalInvites?: number;
+  redPacketsGiven?: number;
+  redPacketsToBeGiven?: number;
 }
 
 export type PacketType =

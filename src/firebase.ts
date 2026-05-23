@@ -29,13 +29,14 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const sessionUser = typeof window !== 'undefined' ? localStorage.getItem('weplay_session') : null;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
+      userId: sessionUser || auth.currentUser?.uid || null,
+      email: sessionUser ? `${sessionUser}@weplay.system` : (auth.currentUser?.email || null),
+      emailVerified: true,
+      isAnonymous: false,
     },
     operationType,
     path

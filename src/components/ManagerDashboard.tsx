@@ -45,6 +45,15 @@ export default function ManagerDashboard({ onAddToast }: ManagerDashboardProps) 
   const [sendingInvite, setSendingInvite] = useState(false);
 
   // Distribute Packet inputs
+  // Editing states for Sponsor Data
+  const [editingSponsorId, setEditingSponsorId] = useState<string | null>(null);
+  const [editTotalInvites, setEditTotalInvites] = useState<number>(0);
+  const [editPacketsGiven, setEditPacketsGiven] = useState<number>(0);
+  const [editPacketsToBeGiven, setEditPacketsToBeGiven] = useState<number>(0);
+
+  // Mapped object: { [sponsorUid]: coinInputString }
+  const [coinInputMap, setCoinInputMap] = useState<Record<string, string>>({});
+
   const [selectedSponsorId, setSelectedSponsorId] = useState('');
   const [packetType, setPacketType] = useState<PacketType>('600 Coins Red Packet');
   const [packetNotes, setPacketNotes] = useState('');
@@ -68,6 +77,9 @@ export default function ManagerDashboard({ onAddToast }: ManagerDashboardProps) 
             role: d.role,
             approvalStatus: d.approvalStatus,
             createdAt: d.createdAt,
+            totalInvites: d.totalInvites !== undefined ? d.totalInvites : 0,
+            redPacketsGiven: d.redPacketsGiven !== undefined ? d.redPacketsGiven : 0,
+            redPacketsToBeGiven: d.redPacketsToBeGiven !== undefined ? d.redPacketsToBeGiven : 0,
           });
         }
       });
@@ -250,6 +262,54 @@ export default function ManagerDashboard({ onAddToast }: ManagerDashboardProps) 
       await submitLog('Override Packet Status', `Manager override packet ${packetId.slice(0, 8)} state to ${newStatus}.`);
     } catch (err: any) {
       onAddToast(`Update denied: ${err.message}`, 'error');
+    }
+  };
+
+  // 4. Update Sponsor metrics directly
+  const handleUpdateDirectMetrics = async (sponsorId: string, totalInv: number, pktsGiven: number, pktsToBeGiven: number) => {
+    try {
+      await updateDoc(doc(db, 'users', sponsorId), {
+        totalInvites: totalInv,
+        redPacketsGiven: pktsGiven,
+        redPacketsToBeGiven: pktsToBeGiven
+      });
+      onAddToast('Sponsor tracked metrics updated successfully.', 'success');
+      await submitLog('Update Sponsor Metrics', `Manager adjusted direct metrics for Sponsor ${sponsorId}. Invites: ${totalInv}, Given: ${pktsGiven}, To Be Given: ${pktsToBeGiven}`);
+      setEditingSponsorId(null);
+    } catch (err: any) {
+      onAddToast(`Failed to update metrics: ${err.message}`, 'error');
+    }
+  };
+
+  // 5. Convert Coins given to Red Packet stats
+  const handleDistributeByCoins = async (sponsorId: string, sponsorName: string, coinsStr: string, currentGiven: number, currentToBeGiven: number) => {
+    const coins = parseInt(coinsStr, 10);
+    if (isNaN(coins) || coins <= 0) {
+      onAddToast('Please enter a valid positive number of coins.', 'warning');
+      return;
+    }
+
+    const rpCount = Math.floor(coins / 600);
+    if (rpCount < 1) {
+      onAddToast('Minimum coins for 1 Red Packet is 600.', 'warning');
+      return;
+    }
+
+    try {
+      const newGiven = currentGiven + rpCount;
+      const newToBeGiven = Math.max(0, currentToBeGiven - rpCount);
+
+      await updateDoc(doc(db, 'users', sponsorId), {
+        redPacketsGiven: newGiven,
+        redPacketsToBeGiven: newToBeGiven
+      });
+
+      setCoinInputMap((prev) => ({ ...prev, [sponsorId]: '' }));
+
+      onAddToast(`Converted ${coins.toLocaleString()} coins into ${rpCount} Red Packets. Added to Given & deducted from To Be Given!`, 'success');
+      await submitLog('Convert Coins to Packets', `Manager distributed ${coins} coins (${rpCount} RPs) to Sponsor ${sponsorName}`);
+    } catch (err: any) {
+      onAddToast(`Conversion update failed: ${err.message}`, 'error');
     }
   };
 
@@ -484,12 +544,12 @@ export default function ManagerDashboard({ onAddToast }: ManagerDashboardProps) 
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="w-5 h-5 text-purple-650" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wider">Sponsor Performance audit</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wider">Sponsor Data & Performance Manager</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {sponsors.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-4 col-span-3 text-center">
+              <p className="text-xs text-slate-400 italic py-4 col-span-2 text-center">
                 No active approved sponsors found.
               </p>
             ) : (
@@ -499,29 +559,167 @@ export default function ManagerDashboard({ onAddToast }: ManagerDashboardProps) 
                 const givenCount = sponsorActivePackets.filter(p => p.status === 'Given').length;
                 const totalCount = sponsorActivePackets.length;
 
-                return (
-                  <div key={sponsor.uid} className="bg-slate-50 dark:bg-slate-955 p-5 border border-slate-105 dark:border-slate-800 rounded-2xl hover:scale-[1.01] transition-transform">
-                    <h4 className="font-extrabold text-sm text-slate-905 dark:text-white truncate">{sponsor.name}</h4>
-                    <p className="text-[10px] text-slate-400 font-mono truncate">
-                      {sponsor.email && sponsor.email.endsWith('@weplay.system')
-                        ? `WePlay ID: ${sponsor.email.replace('@weplay.system', '')}`
-                        : sponsor.email}
-                    </p>
+                const isEditing = editingSponsorId === sponsor.uid;
+                const coinInput = coinInputMap[sponsor.uid] || '';
+                const coinVal = parseInt(coinInput, 10);
+                const calculatedRpCount = !isNaN(coinVal) && coinVal >= 600 ? Math.floor(coinVal / 600) : 0;
 
-                    <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200/50 dark:border-slate-800/40">
+                return (
+                  <div key={sponsor.uid} className="bg-slate-50 dark:bg-slate-950 p-6 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col justify-between gap-6 shadow-sm">
+                    {/* Header: Info */}
+                    <div className="flex justify-between items-start gap-2">
                       <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">Handed out</span>
-                        <span className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                        <h4 className="font-extrabold text-base text-slate-900 dark:text-white truncate">{sponsor.name}</h4>
+                        <p className="text-[11px] text-slate-400 font-mono select-all">
+                          {sponsor.email && sponsor.email.endsWith('@weplay.system')
+                            ? `WePlay ID: ${sponsor.email.replace('@weplay.system', '')}`
+                            : sponsor.email}
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold px-2 py-1 rounded">
+                        Sponsor Active
+                      </span>
+                    </div>
+
+                    {/* Stats from assigned envelope system */}
+                    <div className="grid grid-cols-2 gap-4 py-3 px-4 bg-white dark:bg-slate-905/60 rounded-xl border border-slate-150 dark:border-slate-800">
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">System Handed Out</span>
+                        <span className="text-sm font-bold font-mono text-slate-800 dark:text-slate-200">
                           {givenCount} / {totalCount} Envelopes
                         </span>
                       </div>
-
                       <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">Coin Released</span>
+                        <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wide">System Released Coins</span>
                         <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
                           {givenValue.toLocaleString()} Coins
                         </span>
                       </div>
+                    </div>
+
+                    {/* Core Tracked Stats Area */}
+                    <div className="border-t border-slate-200 dark:border-slate-800/60 pt-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h5 className="text-xs font-bold text-slate-700 dark:text-slate-355 uppercase tracking-wider">
+                          Custom Sponsor Data
+                        </h5>
+                        {!isEditing && (
+                          <button
+                            onClick={() => {
+                              setEditingSponsorId(sponsor.uid);
+                              setEditTotalInvites(sponsor.totalInvites || 0);
+                              setEditPacketsGiven(sponsor.redPacketsGiven || 0);
+                              setEditPacketsToBeGiven(sponsor.redPacketsToBeGiven || 0);
+                            }}
+                            className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-extrabold cursor-pointer"
+                          >
+                            Edit Stats
+                          </button>
+                        )}
+                      </div>
+
+                      {isEditing ? (
+                        <div className="space-y-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-purple-200 dark:border-purple-900/40">
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Total Invites</label>
+                              <input
+                                type="number"
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-805 rounded font-mono text-xs text-slate-933 dark:text-white"
+                                value={editTotalInvites}
+                                onChange={(e) => setEditTotalInvites(Math.max(0, parseInt(e.target.value) || 0))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">RP Given</label>
+                              <input
+                                type="number"
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-805 rounded font-mono text-xs text-slate-933 dark:text-white"
+                                value={editPacketsGiven}
+                                onChange={(e) => setEditPacketsGiven(Math.max(0, parseInt(e.target.value) || 0))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">RP To Be Given</label>
+                              <input
+                                type="number"
+                                className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-805 rounded font-mono text-xs text-slate-933 dark:text-white"
+                                value={editPacketsToBeGiven}
+                                onChange={(e) => setEditPacketsToBeGiven(Math.max(0, parseInt(e.target.value) || 0))}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-end gap-2 text-xs">
+                            <button
+                              onClick={() => setEditingSponsorId(null)}
+                              className="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-slate-700 text-[11px] font-bold rounded hover:bg-slate-300 transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleUpdateDirectMetrics(sponsor.uid, editTotalInvites, editPacketsGiven, editPacketsToBeGiven)}
+                              className="px-3 py-1 bg-purple-650 text-white bg-purple-600 text-[11px] font-bold rounded hover:bg-purple-700 transition-colors cursor-pointer"
+                            >
+                              Save Stats
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                          <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-150 dark:border-slate-800">
+                            <span className="text-[9px] text-slate-400 block uppercase font-sans font-bold">Total Invites</span>
+                            <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100">{sponsor.totalInvites || 0}</span>
+                          </div>
+                          <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-150 dark:border-slate-800">
+                            <span className="text-[9px] text-slate-400 block uppercase font-sans font-bold">RP Given</span>
+                            <span className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">{sponsor.redPacketsGiven || 0}</span>
+                          </div>
+                          <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-150 dark:border-slate-800">
+                            <span className="text-[9px] text-slate-400 block uppercase font-sans font-bold">RP To Be Given</span>
+                            <span className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400">{sponsor.redPacketsToBeGiven || 0}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Coins given to Red Packets calculator */}
+                    <div className="border-t border-slate-200 dark:border-slate-800/60 pt-4 bg-slate-100/55 dark:bg-slate-900/35 -mx-6 -mb-6 p-6 rounded-b-2xl">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Add Coins Given Calculator
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          pattern="[0-9]*"
+                          placeholder="e.g. 600, 3000..."
+                          className="flex-1 px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-purple-500"
+                          value={coinInput}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            setCoinInputMap(prev => ({ ...prev, [sponsor.uid]: val }));
+                          }}
+                        />
+                        <button
+                          onClick={() => handleDistributeByCoins(
+                            sponsor.uid,
+                            sponsor.name,
+                            coinInput,
+                            sponsor.redPacketsGiven || 0,
+                            sponsor.redPacketsToBeGiven || 0
+                          )}
+                          disabled={calculatedRpCount < 1}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+                        >
+                          Send Red Packets
+                        </button>
+                      </div>
+
+                      {calculatedRpCount > 0 && (
+                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-2 animate-fade-in">
+                          ✔ Converts into <span className="font-bold underline">{calculatedRpCount} RP</span> (+{calculatedRpCount} RP Given, -{calculatedRpCount} RP To Be Given)
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
