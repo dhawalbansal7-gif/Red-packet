@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role definitions on registration",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier matching Auth UID" },
+        "name": { "type": "string", "description": "Full name of the user" },
+        "email": { "type": "string", "description": "User email address" },
+        "role": { "type": "string", "enum": ["pending", "sponsor", "manager", "admin"], "description": "Role assigned by Admin or default pending" },
+        "approvalStatus": { "type": "string", "enum": ["Waiting for Approval", "approved", "rejected", "suspended"], "description": "Status of the user's registration" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of profile creation" },
+        "lastLogin": { "type": "string", "format": "date-time", "description": "Timestamp of the last login" }
+      },
+      "required": ["uid", "name", "email", "role", "approvalStatus", "createdAt"]
+    },
+    "Packet": {
+      "title": "Packet",
+      "description": "Red Packets allocated to sponsors and tracked for status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the packet" },
+        "sponsorId": { "type": "string", "description": "UID of the sponsor holding this packet" },
+        "sponsorName": { "type": "string", "description": "Name of the sponsor" },
+        "type": { "type": "string", "enum": ["600 Coins Red Packet", "1800 Coins Red Packet", "3000 Coins Red Packet", "10,000 Coins Red Packet"], "description": "Packet coin packet denomination" },
+        "status": { "type": "string", "enum": ["Pending", "Given", "Sharing Soon"], "description": "Packet distribution status" },
+        "amount": { "type": "number", "description": "Coin amount" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of allocation" },
+        "assignedBy": { "type": "string", "description": "UID of the manager allocating this" },
+        "notes": { "type": "string", "description": "Optional manager or sponsor comment notes" }
+      },
+      "required": ["id", "sponsorId", "sponsorName", "type", "status", "amount", "createdAt"]
+    },
+    "Invite": {
+      "title": "Invite",
+      "description": "Sponsor invitations sent by managers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of the invite" },
+        "managerId": { "type": "string", "description": "UID of the manager who issued the invite" },
+        "managerName": { "type": "string", "description": "Name of the manager who issued the invite" },
+        "sponsorEmail": { "type": "string", "description": "Email being invited" },
+        "sponsorName": { "type": "string", "description": "Name of the prospective sponsor" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Invitation status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of invite creation" }
+      },
+      "required": ["id", "managerId", "managerName", "sponsorEmail", "sponsorName", "status", "createdAt"]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "System audits and activity logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique log ID" },
+        "userId": { "type": "string", "description": "UID of the user performing action" },
+        "userName": { "type": "string", "description": "Name of the user" },
+        "userRole": { "type": "string", "description": "Role of the user" },
+        "action": { "type": "string", "description": "The action that was executed" },
+        "details": { "type": "string", "description": "Detailed log information" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" }
+      },
+      "required": ["id", "userId", "userName", "userRole", "action", "details", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app alerts and notifications to users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique ID of notification" },
+        "userId": { "type": "string", "description": "Recipient UID" },
+        "title": { "type": "string", "description": "Alert title" },
+        "message": { "type": "string", "description": "Message content" },
+        "read": { "type": "boolean", "description": "Reading state toggle" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" }
+      },
+      "required": ["id", "userId", "title", "message", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user document indexed by Auth UID"
+    },
+    "/packets/{packetId}": {
+      "schema": "Packet",
+      "description": "Red packet documents"
+    },
+    "/invites/{inviteId}": {
+      "schema": "Invite",
+      "description": "Sponsor invite documents"
+    },
+    "/logs/{logId}": {
+      "schema": "Log",
+      "description": "System audit logs"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Red Packet Management System",
+  "description": "A secure web portal for managing red packet allocations, tracking sponsor statuses, and managing user roles with full real-time audit logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
